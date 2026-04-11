@@ -33,7 +33,7 @@ This project focuses on predicting stock prices using multiple deep learning arc
 * CNN + BiLSTM
 * CNN + BiLSTM + Attention
 * MTRAN + TCN
-* **BiLSTM + MTRAN + TCN (Final Model) **
+* BiLSTM + MTRAN + TCN (Final Model) 
 
 ## Project Structure
 ```
