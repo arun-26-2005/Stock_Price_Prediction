@@ -185,4 +185,23 @@ with torch.no_grad():
         preds = model(X_batch)
         predictions.extend(preds.squeeze().cpu().numpy())
 
-print("R2 Score:", r2_score(y_test, predictions))
+from utils.evaluation import evaluate_model
+
+
+pred_array = np.zeros((len(predictions), train_scaled.shape[1]))
+pred_array[:, 0] = predictions
+pred_original = scaler.inverse_transform(pred_array)[:, 0]
+
+actual_array = np.zeros((len(y_test), train_scaled.shape[1]))
+actual_array[:, 0] = y_test.cpu().numpy()
+actual_original = scaler.inverse_transform(actual_array)[:, 0]
+
+evaluate_model(
+    actual_original,
+    pred_original,
+    scaler,
+    y_test,
+    train_scaled,
+    test_df=test_df,
+    window_size=window_size
+)
