@@ -146,7 +146,6 @@ elif model_name == "HYBRID":
     model = BiLSTM_MTRAN_TCN(input_size=X_train.shape[2])
     epochs = 600
     lr = 0.00001
-    window_size = 20
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model.to(device)   
