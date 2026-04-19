@@ -150,7 +150,7 @@ elif model_name == "HYBRID":
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model.to(device)   
 criterion = torch.nn.MSELoss()
-optimizer = torch.optim.Adam(model.parameters(), lr=0.00001)
+optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
 best_loss = float('inf')
 
