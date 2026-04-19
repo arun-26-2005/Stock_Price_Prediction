@@ -12,5 +12,7 @@ MODELS = {
     "CNN_BILSTM": "cnn_bilstm",
     "CNN_BILSTM_AM": "cnn_bilstm_am",
     "MTRAN_TCN": "mtran_tcn",
+    "BILSTM_TCN": "bilstm_tcn",
+    "BILSTM_MTRAN": "bilstm_mtran",
     "HYBRID": "hybrid_bilstm_mtran_tcn"
 }

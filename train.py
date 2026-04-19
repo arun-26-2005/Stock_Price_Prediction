@@ -130,6 +130,16 @@ elif model_name == "MTRAN_TCN":
     from models.mtran_tcn import MTRAN_TCN
     model = MTRAN_TCN(input_size=X_train.shape[2])
     epochs = 1e-5
+elif model_name == "BILSTM_TCN":
+    from models.bilstm_tcn import BiLSTM_TCN
+    model = BiLSTM_TCN(input_size=X_train.shape[2])
+    epochs = 200
+    lr = 0.00001
+elif model_name == "BILSTM_MTRAN":
+    from models.bilstm_mtran import BiLSTM_MTRAN
+    model = BiLSTM_MTRAN(input_size=X_train.shape[2])
+    epochs = 200
+    lr = 0.00001
 
 elif model_name == "HYBRID":
     from models.hybrid_bilstm_mtran_tcn import BiLSTM_MTRAN_TCN
