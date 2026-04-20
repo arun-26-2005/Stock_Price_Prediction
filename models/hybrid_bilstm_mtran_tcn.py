@@ -4,30 +4,37 @@ from .mtran import PositionalEncoding
 
 class TCNBlock(nn.Module):
     def __init__(self, input_channels, num_layers=4, channels=32, kernel_size=7):
-        super(TCNBlock, self).__init__()
+        super().__init__()
 
         layers = []
         in_ch = input_channels
 
         for i in range(num_layers):
+            dilation = 2 ** i
+
             layers.append(
                 nn.Conv1d(
                     in_ch,
                     channels,
                     kernel_size,
-                    padding=kernel_size // 2
+                    padding=(kernel_size - 1) * dilation,
+                    dilation=dilation
                 )
             )
             layers.append(nn.ReLU())
-            in_ch = channels  
+
+            in_ch = channels
 
         self.network = nn.Sequential(*layers)
 
     def forward(self, x):
-        x = x.permute(0, 2, 1)   
-        x = self.network(x)
-        x = x.permute(0, 2, 1)   
-        return x
+        x = x.permute(0, 2, 1)
+        out = self.network(x)
+
+        # remove extra padding(causal trimming)
+        out = out[:, :, :x.size(2)]
+
+        return out.permute(0, 2, 1)
 
 class BiLSTM_MTRAN_TCN(nn.Module):
     def __init__(self, input_size, hidden_size=64, embed_dim=64, num_heads=8):
