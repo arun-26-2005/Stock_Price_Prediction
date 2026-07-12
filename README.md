@@ -1,5 +1,12 @@
-Here is your project information organized and formatted into a clean, professional `README.md` file ready for your repository. You can copy the code block below directly into your project.
-
+---
+title: Stock Price Prediction Backend
+emoji: 📈
+colorFrom: blue
+colorTo: indigo
+sdk: docker
+app_port: 7860
+pinned: false
+---
 
 # Stock Price Prediction using Deep Learning
 
