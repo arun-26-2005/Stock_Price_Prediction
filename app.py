@@ -1,5 +1,6 @@
 import gradio as gr
 from backend.app import app as fastapi_app
+import uvicorn
 
 # Simple health check helper for Gradio Interface
 def api_status(message):
@@ -17,3 +18,8 @@ demo = gr.Interface(
 # Mount Gradio onto our FastAPI application.
 # This keeps our FastAPI server at the root "/" and exposes the Gradio GUI at "/gui"
 app = gr.mount_gradio_app(fastapi_app, demo, path="/gui")
+
+# Start Uvicorn ASGI server directly to keep the Hugging Face container alive
+# listens on port 7860 (Hugging Face default port)
+if __name__ == "__main__":
+    uvicorn.run("app:app", host="0.0.0.0", port=7860, reload=False)
