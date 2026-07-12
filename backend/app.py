@@ -9,7 +9,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import numpy as np
 import pandas as pd
-import torch
 import joblib
 import yfinance as yf
 from fastapi import FastAPI, BackgroundTasks, Depends, Request, status
@@ -92,6 +91,7 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 def _get_device():
     """Return best available torch device: cuda > mps > cpu."""
+    import torch
     if torch.cuda.is_available():
         return torch.device("cuda")
     elif torch.backends.mps.is_available():
@@ -382,6 +382,7 @@ async def predict_stock(stock: str, request: Request, model: str = "HYBRID", alp
             )
 
         # --- Build input sequence ---
+        import torch
         last_sequence = scaled_features[-window_size:]
         X_input = np.expand_dims(last_sequence, axis=0)
         X_tensor = torch.tensor(X_input, dtype=torch.float32)
@@ -528,6 +529,7 @@ async def backtest_stock(stock: str, model: str = "HYBRID"):
                 content={"error": "Not enough data for backtesting"},
             )
 
+        import torch
         X_test_tensor = torch.tensor(X_test, dtype=torch.float32)
 
         # --- Load model ---
