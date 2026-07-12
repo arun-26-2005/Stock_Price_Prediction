@@ -1,0 +1,12 @@
+fastapi
+uvicorn[standard]
+python-multipart
+yfinance
+pandas
+numpy
+torch
+scikit-learn
+joblib
+transformers
+nltk
+requests
