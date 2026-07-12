@@ -4,11 +4,11 @@ from huggingface_hub import HfApi
 
 def deploy():
     token = os.environ.get("HF_TOKEN")
-    if not token:
-        print("Error: HF_TOKEN environment variable not set.")
+    repo_id = os.environ.get("HF_REPO_ID")
+    if not token or not repo_id:
+        print("Error: Both HF_TOKEN and HF_REPO_ID environment variables must be set.")
         sys.exit(1)
         
-    repo_id = "arunkumar2612/stock-price-prediction-backend"
     print(f"Initiating Hugging Face API connection for space: {repo_id}...")
     
     api = HfApi(token=token)
