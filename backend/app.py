@@ -12,14 +12,35 @@ import pandas as pd
 import torch
 import joblib
 import yfinance as yf
-from fastapi import FastAPI, BackgroundTasks
+from fastapi import FastAPI, BackgroundTasks, Depends, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
+from typing import Optional
 
 from config import DATASETS, MODELS
 from utils.data_preprocessing import preprocess_dataset
 from utils.sentiment_analyzer import fetch_recent_news, analyze_sentiment, TICKER_MAP
 from utils.backtest import run_backtest
+
+# Database & Auth modules
+from sqlalchemy.orm import Session
+from backend.database import init_db, get_db, User as DBUser, UserSearch as DBUserSearch
+from backend.auth import get_password_hash, verify_password, create_access_token, get_current_user, get_admin_user, decode_access_token
+
+# ---------------------------------------------------------------------------
+# Pydantic Schemas
+# ---------------------------------------------------------------------------
+
+class SignupRequest(BaseModel):
+    username: str
+    email: str
+    password: str
+    role: Optional[str] = "user"
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
 
 # ---------------------------------------------------------------------------
 # FastAPI App Setup
@@ -30,6 +51,28 @@ app = FastAPI(
     description="Backend API for the Stock Price Prediction Dashboard",
     version="1.0.0",
 )
+
+# Startup DB initializations
+@app.on_event("startup")
+def startup_event():
+    print("[startup] Initializing SQLite database...")
+    init_db()
+    
+    # Create default admin account if not present
+    db = next(get_db())
+    admin_exists = db.query(DBUser).filter(DBUser.username == "admin").first()
+    if not admin_exists:
+        print("[startup] Creating default admin account (user: admin, pass: adminpassword)")
+        hashed_pw = get_password_hash("adminpassword")
+        admin_user = DBUser(
+            username="admin",
+            email="admin@stock.ai",
+            password_hash=hashed_pw,
+            role="admin"
+        )
+        db.add(admin_user)
+        db.commit()
+    db.close()
 
 # CORS — allow all origins for development
 app.add_middleware(
@@ -125,6 +168,25 @@ SECTOR_MAP = {
 def _get_sector(stock: str) -> str:
     """Resolve the sector name for a stock, fallback to IT_SECTOR."""
     return SECTOR_MAP.get(stock.upper(), "IT_SECTOR")
+
+
+def _log_user_search(request: Request, stock: str, db: Session):
+    """Log the stock search query if the request contains a valid bearer token."""
+    try:
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header.split(" ")[1]
+            payload = decode_access_token(token)
+            if payload:
+                username = payload.get("sub")
+                user = db.query(DBUser).filter(DBUser.username == username).first()
+                if user:
+                    print(f"[_log_user_search] Logging search for {user.username}: {stock}")
+                    search_log = DBUserSearch(user_id=user.id, symbol=stock.upper())
+                    db.add(search_log)
+                    db.commit()
+    except Exception as e:
+        print(f"[_log_user_search] Error logging search: {e}")
 
 
 def _checkpoint_path(stock: str, model_name: str = "HYBRID") -> str:
@@ -242,13 +304,16 @@ async def list_stocks():
 
 
 @app.get("/api/predict/{stock}")
-async def predict_stock(stock: str, model: str = "HYBRID", alpha: float = 0.015):
+async def predict_stock(stock: str, request: Request, model: str = "HYBRID", alpha: float = 0.015, db: Session = Depends(get_db)):
     """Run live prediction for a stock using a trained model + sentiment adjustment."""
     stock = stock.upper()
     model_name = model.upper()
     print(f"\n[/api/predict/{stock}] Starting prediction with model={model_name}, alpha={alpha}")
 
     try:
+        # --- Log Search if user is authenticated ---
+        _log_user_search(request, stock, db)
+
         # --- Validate stock ---
         # Allow any symbol to be requested. If not pre-configured, we download dynamically.
         symbol = TICKER_MAP.get(stock, f"{stock}.NS")
@@ -370,12 +435,15 @@ async def predict_stock(stock: str, model: str = "HYBRID", alpha: float = 0.015)
 
 
 @app.get("/api/history/{stock}")
-async def stock_history(stock: str):
+async def stock_history(stock: str, request: Request, db: Session = Depends(get_db)):
     """Return processed historical data with technical indicators for charting."""
     stock = stock.upper()
     print(f"\n[/api/history/{stock}] Loading historical data...")
 
     try:
+        # --- Log Search if user is authenticated ---
+        _log_user_search(request, stock, db)
+
         # Allow any symbol to be requested. If not pre-configured, we download dynamically.
 
         df = _load_and_preprocess_csv(stock)
@@ -656,4 +724,103 @@ async def get_retrain_status(stock: str):
     stock_upper = stock.upper()
     status_info = retrain_tasks.get(stock_upper, {"status": "idle", "message": "Ready to sync."})
     return status_info
+
+
+# ---------------------------------------------------------------------------
+# Auth Endpoints
+# ---------------------------------------------------------------------------
+
+@app.post("/api/auth/signup")
+async def signup(req: SignupRequest, db: Session = Depends(get_db)):
+    # Check if username or email exists
+    if db.query(DBUser).filter(DBUser.username == req.username).first():
+        return JSONResponse(status_code=400, content={"error": "Username already registered"})
+    if db.query(DBUser).filter(DBUser.email == req.email).first():
+        return JSONResponse(status_code=400, content={"error": "Email already registered"})
+        
+    hashed_pw = get_password_hash(req.password)
+    user = DBUser(
+        username=req.username,
+        email=req.email,
+        password_hash=hashed_pw,
+        role=req.role or "user"
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    
+    # Generate token
+    token = create_access_token({"sub": user.username})
+    return {"access_token": token, "token_type": "bearer", "username": user.username, "role": user.role}
+
+
+@app.post("/api/auth/login")
+async def login(req: LoginRequest, db: Session = Depends(get_db)):
+    user = db.query(DBUser).filter(DBUser.username == req.username).first()
+    if not user or not verify_password(req.password, user.password_hash):
+        return JSONResponse(status_code=401, content={"error": "Invalid username or password"})
+        
+    token = create_access_token({"sub": user.username})
+    return {"access_token": token, "token_type": "bearer", "username": user.username, "role": user.role}
+
+
+@app.get("/api/auth/me")
+async def get_me(current_user: DBUser = Depends(get_current_user)):
+    return {
+        "username": current_user.username,
+        "email": current_user.email,
+        "role": current_user.role,
+        "created_at": current_user.created_at.strftime("%Y-%m-%d")
+    }
+
+
+# ---------------------------------------------------------------------------
+# Admin Endpoints
+# ---------------------------------------------------------------------------
+
+@app.get("/api/admin/metrics")
+async def get_admin_metrics(current_user: DBUser = Depends(get_admin_user), db: Session = Depends(get_db)):
+    try:
+        total_users = db.query(DBUser).count()
+        total_searches = db.query(DBUserSearch).count()
+        
+        # Count popular tickers
+        from sqlalchemy import func
+        popular_searches = db.query(
+            DBUserSearch.symbol, 
+            func.count(DBUserSearch.symbol).label("count")
+        ).group_by(DBUserSearch.symbol).order_by(func.count(DBUserSearch.symbol).desc()).limit(5).all()
+        
+        popular_list = [{"symbol": item[0], "count": item[1]} for item in popular_searches]
+        
+        return {
+            "total_users": total_users,
+            "total_searches": total_searches,
+            "popular_searches": popular_list
+        }
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+
+@app.get("/api/admin/logs")
+async def get_admin_logs(current_user: DBUser = Depends(get_admin_user), db: Session = Depends(get_db)):
+    try:
+        logs = db.query(
+            DBUserSearch.id,
+            DBUser.username,
+            DBUserSearch.symbol,
+            DBUserSearch.timestamp
+        ).join(DBUser, DBUserSearch.user_id == DBUser.id).order_by(DBUserSearch.timestamp.desc()).limit(100).all()
+        
+        log_list = []
+        for log in logs:
+            log_list.append({
+                "id": log[0],
+                "username": log[1],
+                "symbol": log[2],
+                "timestamp": log[3].strftime("%Y-%m-%d %H:%M:%S")
+            })
+        return {"logs": log_list}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
 

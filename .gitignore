@@ -8,6 +8,7 @@ venv/
 *.pth
 !checkpoints/*.pth
 
-# Ignore local processed cache data and plots
+# Ignore local processed cache data, databases, and plots
 data/processed_*.csv
+data/*.db
 plots/*.png

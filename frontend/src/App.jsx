@@ -7,6 +7,8 @@ import Backtest from './pages/Backtest'
 import MacroHeatmap from './pages/MacroHeatmap'
 import ModelComparison from './pages/ModelComparison'
 import Architecture from './pages/Architecture'
+import Login from './pages/Login'
+import AdminDashboard from './pages/AdminDashboard'
 
 function App() {
   return (
@@ -20,6 +22,8 @@ function App() {
           <Route path="/macro/:stock" element={<MacroHeatmap />} />
           <Route path="/models" element={<ModelComparison />} />
           <Route path="/architecture" element={<Architecture />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/admin" element={<AdminDashboard />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </div>
