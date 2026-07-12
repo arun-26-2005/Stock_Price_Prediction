@@ -286,6 +286,16 @@ def _load_and_preprocess_csv(stock: str):
 # ---------------------------------------------------------------------------
 
 
+@app.get("/")
+async def root():
+    return {
+        "status": "healthy",
+        "service": "StockAI Pro Forecast API",
+        "version": "1.0.0",
+        "documentation": "/docs"
+    }
+
+
 @app.get("/api/stocks")
 async def list_stocks():
     """Return available stocks with metadata."""
