@@ -90,80 +90,85 @@ def analyze_sentiment(articles):
         
     headlines = [a['title'] for a in articles]
     
-    # Option 1: FinBERT (Financial BERT)
-    try:
-        print("Attempting to load FinBERT model...")
-        from transformers import pipeline
-        # Use ProsusAI/finbert (very stable, lightweight and optimized for finance)
-        classifier = pipeline("sentiment-analysis", model="ProsusAI/finbert", device=-1)
-        print("FinBERT model loaded successfully.")
-        
-        results = classifier(headlines)
-        
-        scores = []
-        detailed_sentiments = []
-        
-        for article, res in zip(articles, results):
-            label = res['label'].lower() # 'positive', 'negative', 'neutral'
-            score = res['score']
-            
-            # Map to [-1, 1] range
-            if label == 'positive':
-                num_score = score
-            elif label == 'negative':
-                num_score = -score
-            else: # neutral
-                num_score = 0.0
-                
-            scores.append(num_score)
-            detailed_sentiments.append({
-                'title': article['title'],
-                'publisher': article['publisher'],
-                'sentiment': label,
-                'confidence': score,
-                'score': num_score
-            })
-            
-        avg_score = sum(scores) / len(scores) if scores else 0.0
-        return avg_score, detailed_sentiments
-        
-    except Exception as e:
-        print(f"FinBERT failed to initialize: {e}. Falling back to VADER...")
-        
-        # Option 2: NLTK VADER Fallback
+    # We default to NLTK VADER for high performance, low RAM, and instant execution (0.001s).
+    # This prevents timeout and RAM limit crashes on cloud hosts like Render.
+    # To run FinBERT locally, set USE_FINBERT=true in the environment.
+    use_finbert = os.environ.get("USE_FINBERT", "false").lower() == "true"
+    
+    if use_finbert:
         try:
-            import nltk
-            from nltk.sentiment.vader import SentimentIntensityAnalyzer
-            nltk.download('vader_lexicon', quiet=True)
+            print("Attempting to load FinBERT model...")
+            from transformers import pipeline
+            # Use ProsusAI/finbert (very stable, lightweight and optimized for finance)
+            classifier = pipeline("sentiment-analysis", model="ProsusAI/finbert", device=-1)
+            print("FinBERT model loaded successfully.")
             
-            analyzer = SentimentIntensityAnalyzer()
+            results = classifier(headlines)
+            
             scores = []
             detailed_sentiments = []
             
-            for article in articles:
-                vader_scores = analyzer.polarity_scores(article['title'])
-                compound = vader_scores['compound'] # compound is between -1.0 and +1.0
+            for article, res in zip(articles, results):
+                label = res['label'].lower() # 'positive', 'negative', 'neutral'
+                score = res['score']
                 
-                # Determine label
-                if compound >= 0.05:
-                    label = 'positive'
-                elif compound <= -0.05:
-                    label = 'negative'
-                else:
-                    label = 'neutral'
+                # Map to [-1, 1] range
+                if label == 'positive':
+                    num_score = score
+                elif label == 'negative':
+                    num_score = -score
+                else: # neutral
+                    num_score = 0.0
                     
-                scores.append(compound)
+                scores.append(num_score)
                 detailed_sentiments.append({
                     'title': article['title'],
                     'publisher': article['publisher'],
                     'sentiment': label,
-                    'confidence': abs(compound),
-                    'score': compound
+                    'confidence': score,
+                    'score': num_score
                 })
                 
             avg_score = sum(scores) / len(scores) if scores else 0.0
             return avg_score, detailed_sentiments
             
-        except Exception as ex:
-            print(f"Fallback to VADER also failed: {ex}")
-            return 0.0, []
+        except Exception as e:
+            print(f"FinBERT failed to initialize: {e}. Falling back to VADER...")
+            
+    # Default Option: NLTK VADER
+    try:
+        import nltk
+        from nltk.sentiment.vader import SentimentIntensityAnalyzer
+        nltk.download('vader_lexicon', quiet=True)
+        
+        analyzer = SentimentIntensityAnalyzer()
+        scores = []
+        detailed_sentiments = []
+        
+        for article in articles:
+            vader_scores = analyzer.polarity_scores(article['title'])
+            compound = vader_scores['compound'] # compound is between -1.0 and +1.0
+            
+            # Determine label
+            if compound >= 0.05:
+                label = 'positive'
+            elif compound <= -0.05:
+                label = 'negative'
+            else:
+                label = 'neutral'
+                
+            scores.append(compound)
+            detailed_sentiments.append({
+                'title': article['title'],
+                'publisher': article['publisher'],
+                'sentiment': label,
+                'confidence': abs(compound),
+                'score': compound
+            })
+            
+        avg_score = sum(scores) / len(scores) if scores else 0.0
+        return avg_score, detailed_sentiments
+        
+    except Exception as ex:
+        print(f"VADER failed: {ex}")
+        return 0.0, []
