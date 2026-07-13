@@ -339,17 +339,7 @@ async def predict_stock(stock: str, request: Request, model: str = "HYBRID", alp
                 content={"error": "Base universal models not initialized. Please train TCS first."},
             )
 
-        # --- Load or Fit Scaler ---
-        if stock in ["TCS", "RELIANCE", "INFY"] and os.path.exists(scaler_path):
-            print(f"[/api/predict/{stock}] Loading pre-trained scaler from {scaler_path}...")
-            scaler = joblib.load(scaler_path)
-        else:
-            print(f"[/api/predict/{stock}] Fitting dynamic StandardScaler on historical database...")
-            from sklearn.preprocessing import StandardScaler
-            df_hist = _load_and_preprocess_csv(stock)
-            df_hist_features = df_hist.drop(columns=["Date"])
-            scaler = StandardScaler()
-            scaler.fit(df_hist_features)
+
 
         # --- Download live data ---
         symbol = TICKER_MAP.get(stock, f"{stock}.NS")
@@ -392,11 +382,14 @@ async def predict_stock(stock: str, request: Request, model: str = "HYBRID", alp
         last_trade_date = df["Date"].max().strftime("%Y-%m-%d")
         last_close_price = float(df["Close"].iloc[-1])
 
-        # --- Preprocess ---
-        print(f"[/api/predict/{stock}] Preprocessing features...")
+        # --- Preprocess & Dynamic Scaling ---
+        print(f"[/api/predict/{stock}] Preprocessing features & scaling dynamically...")
         df_enriched = preprocess_dataset(df, stock, use_cache=False)
         df_features = df_enriched.drop(columns=["Date"])
-        scaled_features = scaler.transform(df_features)
+        
+        from sklearn.preprocessing import StandardScaler
+        scaler = StandardScaler()
+        scaled_features = scaler.fit_transform(df_features)
 
         window_size = 10
         if len(scaled_features) < window_size:
