@@ -47,6 +47,7 @@ def evaluate_model(actual_original, pred_original, scaler, y_test, train_scaled,
     print(f"RMSE: {rmse:.4f}")
     print(f"MAE: {mae:.4f}")
     print(f"R2: {r2:.4f}")
+    print(f"Directional Win Rate: {dir_acc:.2f}%")
   
 
     # ===================== PLOTS ===================== #
