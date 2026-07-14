@@ -1,5 +1,3 @@
-import matplotlib
-matplotlib.use('Agg')
 import argparse
 import pandas as pd
 import torch
@@ -22,7 +20,6 @@ def create_sequences(data, window=10):
 parser = argparse.ArgumentParser()
 parser.add_argument("--dataset", type=str, default="TCS")
 parser.add_argument("--model", type=str, default="HYBRID")
-parser.add_argument("--epochs", type=int, default=None)
 args = parser.parse_args()
 dataset_name = args.dataset.upper()
 
@@ -39,14 +36,11 @@ df=df.drop([0,1]).reset_index(drop=True)
 df = df.dropna()
 df = df.reset_index(drop=True)
 df=df.sort_values('Date')
-
-# Convert string values to float64 for safety
-for col in ['Close', 'High', 'Low', 'Open', 'Volume']:
-    df[col] = pd.to_numeric(df[col], errors='coerce')
-
-# Enrich dataset with global macro features and technical indicators
-from utils.data_preprocessing import preprocess_dataset
-df = preprocess_dataset(df, dataset_name)
+df['MA5']=df['Close'].rolling(5).mean()
+df['MA10']=df['Close'].rolling(10).mean()
+df.dropna(inplace=True)
+df.reset_index(drop=True, inplace=True)
+df.head()
 
 split_date = '2023-01-01'
 
@@ -94,12 +88,7 @@ test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
 
 #Model, Loss, Optimizer
 from models.hybrid_bilstm_mtran_tcn import BiLSTM_MTRAN_TCN
-if torch.cuda.is_available():
-    device = torch.device("cuda")
-elif torch.backends.mps.is_available():
-    device = torch.device("mps")
-else:
-    device = torch.device("cpu")
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 model_name = args.model.upper()
 
@@ -158,15 +147,7 @@ elif model_name == "HYBRID":
     epochs = 600
     lr = 0.00001
 
-if args.epochs is not None:
-    epochs = args.epochs
-
-if torch.cuda.is_available():
-    device = torch.device("cuda")
-elif torch.backends.mps.is_available():
-    device = torch.device("mps")
-else:
-    device = torch.device("cpu")
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model.to(device)   
 criterion = torch.nn.MSELoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=lr)
@@ -200,17 +181,6 @@ for epoch in range(epochs):
     print(f"Epoch {epoch+1}, Total Loss: {total_loss:.4f}")
 
 
-# Save trained model checkpoint and scaler
-import os
-import joblib
-os.makedirs("checkpoints", exist_ok=True)
-checkpoint_path = os.path.join("checkpoints", f"{dataset_name}_{model_name}.pth")
-torch.save(model.state_dict(), checkpoint_path)
-print(f"Saved trained model checkpoint to {checkpoint_path}")
-
-scaler_path = os.path.join("checkpoints", f"{dataset_name}_scaler.joblib")
-joblib.dump(scaler, scaler_path)
-print(f"Saved trained scaler to {scaler_path}")
 
 # Evaluation
 
@@ -235,43 +205,12 @@ actual_array = np.zeros((len(y_test), train_scaled.shape[1]))
 actual_array[:, 0] = y_test.cpu().numpy()
 actual_original = scaler.inverse_transform(actual_array)[:, 0]
 
-eval_df = evaluate_model(
+evaluate_model(
     actual_original,
     pred_original,
     scaler,
     y_test,
     train_scaled,
     test_df=test_df,
-    window_size=window_size,
-    save_dir="plots",
-    model_name=f"{dataset_name}_{model_name}"
+    window_size=window_size
 )
-
-# Run financial backtesting strategy
-from utils.backtest import run_backtest, plot_backtest
-import os
-
-print("\n" + "="*40)
-print("RUNNING FINANCIAL BACKTEST ON PREDICTIONS")
-print("="*40)
-
-backtest_results = run_backtest(
-    actual_prices=eval_df['Actual'].values,
-    predicted_prices=eval_df['Predicted'].values,
-    dates=eval_df['Date'],
-    initial_capital=100000.0,
-    transaction_cost=0.001,
-    threshold=0.0025
-)
-
-print(f"Starting Capital       : INR 100,000.00")
-print(f"Final Portfolio Value  : INR {backtest_results['final_value']:.2f}")
-print(f"Model Strategy Return  : {backtest_results['total_return']:.2f}% (Sharpe: {backtest_results['sharpe_ratio']:.2f}, Max Drawdown: {backtest_results['max_drawdown']:.2f}%)")
-print(f"Buy & Hold Return      : {backtest_results['bench_return']:.2f}% (Sharpe: {backtest_results['bench_sharpe']:.2f}, Max Drawdown: {backtest_results['bench_max_drawdown']:.2f}%)")
-print(f"Trades Executed        : {backtest_results['num_trades']} (Win Rate: {backtest_results['win_rate']:.2f}%)")
-print("="*40)
-
-# Save backtest equity curve plot
-os.makedirs("plots", exist_ok=True)
-plot_path = os.path.join("plots", f"{dataset_name}_{model_name}_backtest.png")
-plot_backtest(backtest_results, save_path=plot_path)

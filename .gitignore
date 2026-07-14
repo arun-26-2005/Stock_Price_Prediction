@@ -1,14 +1,5 @@
 __pycache__/
 *.pyc
-.ipynb_checkpoints/
-venv/
-.DS_Store
-
-# Ignore standard model checkpoints, but allow pre-trained checkpoints
 *.pth
-!checkpoints/*.pth
-
-# Ignore local processed cache data, databases, and plots
-data/processed_*.csv
-data/*.db
-plots/*.png
+.ipynb_checkpoints/
+venv/-

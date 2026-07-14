@@ -1,13 +1,5 @@
----
-title: Stock Price Prediction Backend
-emoji: 📈
-colorFrom: blue
-colorTo: indigo
-sdk: gradio
-sdk_version: 4.19.0
-app_file: app.py
-pinned: false
----
+Here is your project information organized and formatted into a clean, professional `README.md` file ready for your repository. You can copy the code block below directly into your project.
+
 
 # Stock Price Prediction using Deep Learning
 

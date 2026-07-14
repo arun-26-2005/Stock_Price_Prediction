@@ -1,12 +1,11 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import os
 
 from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
 
 
-def evaluate_model(actual_original, pred_original, scaler, y_test, train_scaled, test_df=None, window_size=10, save_dir=None, model_name="Model"):
+def evaluate_model(actual_original, pred_original, scaler, y_test, train_scaled, test_df=None, window_size=10):
 
     # ---------- Convert to numpy ----------
     actual_vals = np.asarray(actual_original).reshape(-1)
@@ -51,8 +50,6 @@ def evaluate_model(actual_original, pred_original, scaler, y_test, train_scaled,
   
 
     # ===================== PLOTS ===================== #
-    if save_dir:
-        os.makedirs(save_dir, exist_ok=True)
 
     # 1. Actual vs Predicted
     plt.figure(figsize=(14,6))
@@ -63,8 +60,6 @@ def evaluate_model(actual_original, pred_original, scaler, y_test, train_scaled,
     plt.legend()
     plt.title("Actual vs Predicted")
     plt.grid()
-    if save_dir:
-        plt.savefig(os.path.join(save_dir, f"{model_name}_actual_vs_predicted.png"), dpi=150)
     plt.show()
 
     # 2. Residual Plot
@@ -73,8 +68,6 @@ def evaluate_model(actual_original, pred_original, scaler, y_test, train_scaled,
     plt.axhline(0, linestyle='--')
     plt.title("Residuals Over Time")
     plt.grid()
-    if save_dir:
-        plt.savefig(os.path.join(save_dir, f"{model_name}_residuals.png"), dpi=150)
     plt.show()
 
     # 3. Scatter Plot
@@ -85,8 +78,6 @@ def evaluate_model(actual_original, pred_original, scaler, y_test, train_scaled,
     plt.plot([min_val, max_val], [min_val, max_val], 'r--')
     plt.title("Actual vs Predicted Scatter")
     plt.grid()
-    if save_dir:
-        plt.savefig(os.path.join(save_dir, f"{model_name}_scatter.png"), dpi=150)
     plt.show()
 
     # 4. Error Distribution
@@ -94,8 +85,6 @@ def evaluate_model(actual_original, pred_original, scaler, y_test, train_scaled,
     plt.hist(eval_df['Error'], bins=30)
     plt.title("Error Distribution")
     plt.grid()
-    if save_dir:
-        plt.savefig(os.path.join(save_dir, f"{model_name}_error_dist.png"), dpi=150)
     plt.show()
 
     # 5. Cumulative Error
@@ -103,8 +92,6 @@ def evaluate_model(actual_original, pred_original, scaler, y_test, train_scaled,
     plt.plot(eval_df['Date'], eval_df['Error'].cumsum())
     plt.title("Cumulative Error")
     plt.grid()
-    if save_dir:
-        plt.savefig(os.path.join(save_dir, f"{model_name}_cumulative_error.png"), dpi=150)
     plt.show()
 
     # 6. Direction Plot
@@ -113,8 +100,6 @@ def evaluate_model(actual_original, pred_original, scaler, y_test, train_scaled,
     plt.plot(np.sign(pred_diff), label="Predicted Direction")
     plt.legend()
     plt.title("Direction Comparison")
-    if save_dir:
-        plt.savefig(os.path.join(save_dir, f"{model_name}_direction_comparison.png"), dpi=150)
     plt.show()
 
     return eval_df
